@@ -1,85 +1,75 @@
 # .github/release-drafter.yml
 
-# Define categories based on labels prompted in the PR template
-# Order matters: Breaking Changes often listed first.
+# Define labels if they don't exist (optional, requires repo write access for the action)
+# ensure-labels-exist:
+#   - feature
+#   - enhancement
+#   - bug
+#   - breaking-change
+#   - notes
+#   - documentation
+#   - chore
+#   - tests
+#   - build
+#   - refactor
+#   - skip-changelog
+
+# Define the sections/categories based on labels
+# Order matters for the final output
 categories:
-  - title: '💥 Breaking Changes'
-    labels:
-      - 'breaking-change' # Make sure this label exists in your repo
-  - title: '🚀 Features & Enhancements'
-    labels:
-      - 'feature'
-      - 'enhancement'
-  - title: '🐛 Bug Fixes'
-    labels:
-      - 'fix'
-      - 'bug'
-  - title: '📦 Dependency Updates'
-    labels:
-      - 'dependencies'
-  - title: '🔧 Maintenance & Chore'
-    labels:
-      - 'chore'
-      - 'maintenance'
-      - 'refactor'
-      - 'build'
-      - 'ci'
-      - 'tests'
-  - title: '📖 Documentation'
-    labels:
-      - 'documentation'
+  - title: '⚠️ BREAKING CHANGES' # Use emojis or clear markers
+    labels: ['breaking-change']
+  - title: '✨ FEATURES'
+    labels: ['feature']
+  - title: '📈 ENHANCEMENTS'
+    labels: ['enhancement']
+  - title: '🐛 BUG FIXES'
+    labels: ['bug']
+  - title: '📝 NOTES / UPGRADE INSTRUCTIONS'
+    labels: ['notes']
+  # Optional: Include documentation if desired, or exclude it
+  # - title: '📖 DOCUMENTATION'
+  #   labels: ['documentation']
 
-# Exclude PRs with certain labels from the release notes
+# Exclude PRs with these labels entirely from the notes
 exclude-labels:
-  - 'skip-changelog'
+  - 'skip-changelog' # Standard label to omit things
+  - 'chore'          # Example: Exclude routine maintenance
+  - 'tests'
+  - 'build'
+  - 'refactor'
+  # - 'documentation' # Uncomment to exclude documentation changes
 
-# Template for each change line within a category
-# $TITLE: PR Title
-# $NUMBER: PR Number
-# $AUTHOR: PR Author username
-# $BODY: Full PR Body (Use with caution, can be long)
-# Consider using a well-written PR title as the primary source.
-change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+# Template for each line item within a category
+# Uses the PR title directly, similar to Terraform's style
+# $TITLE = PR Title
+# $NUMBER = PR Number
+# ($AUTHOR can also be used if desired: @$AUTHOR)
+change-template: '- $TITLE ([#$NUMBER])'
+# If you REALLY want to use the "Summary for Release Notes" section from the PR Body,
+# it requires complex regex in the template, e.g.:
+# change-template: '- $BODY**REQUIRED:**\n\n([^\n]+) ([#$NUMBER])'
+# This is fragile and relies on exact template matching. Sticking to $TITLE is simpler.
 
-# Template for the overall release notes body
-# $CHANGES will be replaced with the categorized list based on the template above
-# $PREVIOUS_TAG: Tag of the previous release
-# $RESOLVED_VERSION: The version being released (from workflow)
-# $CONTRIBUTORS: List of contributors since the last release
+# Template for the overall release body
+# $CHANGES = The assembled, categorized list of changes
+# $PREVIOUS_TAG = Previous release tag
+# $RESOLVED_VERSION = The new version tag being released
 template: |
-  ## What's Changed
+  <!-- Optional: Add release date or other introductory text here -->
 
   $CHANGES
 
-  ## Contributors
-  Huge thanks to everyone who contributed to this release:
-  $CONTRIBUTORS
+  <!-- Optional: Add contributor list or other closing remarks -->
+  <!-- For more details see the full commit history: $PREVIOUS_TAG...$RESOLVED_VERSION -->
 
-  **Full Changelog**: $PREVIOUS_TAG...$RESOLVED_VERSION
+# Title for the release page
+name-template: '$RESOLVED_VERSION' # Just the version number, like Terraform
 
-# Template for the release title
-name-template: 'Release $RESOLVED_VERSION'
-
-# Template for the tag name (usually corresponds to the version)
-# Our workflow explicitly creates the tag, but this can be a fallback/reference
+# Tag name (workflow creates it, this is for reference/RD internal use)
 tag-template: 'v$RESOLVED_VERSION'
 
-# Optional: Sort changes within categories (commit, title, number) and direction (ascending, descending)
-# sort-by: title
-# sort-direction: ascending # Default is descending commit date
-
-# Optional: Include contributors section automatically
-# contributors:
-#  - title: 'Contributors'
-#    template: 'Thanks again to $CONTRIBUTORS!' # Simpler way if you don't need custom text
-
-# Optional: Version Resolver - we calculate version in the workflow,
-# but RD can also infer based on labels (e.g., 'major', 'minor', 'patch' labels)
-# version-resolver:
-#   major:
-#     labels: ['major', 'breaking-change'] # Example if you used labels for bumping
-#   minor:
-#     labels: ['minor', 'feature', 'enhancement']
-#   patch:
-#     labels: ['patch', 'fix', 'bug', 'chore', 'documentation']
-#   default: patch # Default bump if no matching labels found
+# Automatically manages the draft (good practice, though our workflow publishes)
+replacers:
+  - search: /<!--(.*?)-->/g # Remove comments from the final notes
+    replace: ''
