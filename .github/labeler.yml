@@ -1,0 +1,9 @@
+# .github/labeler.yml
+
+# Label any PR changing Terraform files at the root (or in any subdirectory)
+terraform:
+  - '*.tf'
+
+# Optionally, label documentation changes
+documentation:
+  - '*.md'
