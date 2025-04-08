@@ -1,9 +1,12 @@
 # .github/release-drafter.yml
 
-# Configuration for Release Drafter: https://github.com/release-drafter/release-drafter#configuration
-# Use categories to group changes based on PR labels
+# Define categories based on labels prompted in the PR template
+# Order matters: Breaking Changes often listed first.
 categories:
-  - title: '🚀 Features'
+  - title: '💥 Breaking Changes'
+    labels:
+      - 'breaking-change' # Make sure this label exists in your repo
+  - title: '🚀 Features & Enhancements'
     labels:
       - 'feature'
       - 'enhancement'
@@ -11,34 +14,72 @@ categories:
     labels:
       - 'fix'
       - 'bug'
-  - title: '🔧 Maintenance'
+  - title: '📦 Dependency Updates'
+    labels:
+      - 'dependencies'
+  - title: '🔧 Maintenance & Chore'
     labels:
       - 'chore'
       - 'maintenance'
-      - 'dependencies'
+      - 'refactor'
+      - 'build'
+      - 'ci'
+      - 'tests'
   - title: '📖 Documentation'
     labels:
       - 'documentation'
 
-# Template for the release notes body
-# $NEXT_PATCH_VERSION, $NEXT_MINOR_VERSION, $NEXT_MAJOR_VERSION can be used
-# $CHANGES will be replaced with the categorized list of PRs
+# Exclude PRs with certain labels from the release notes
+exclude-labels:
+  - 'skip-changelog'
+
+# Template for each change line within a category
+# $TITLE: PR Title
+# $NUMBER: PR Number
+# $AUTHOR: PR Author username
+# $BODY: Full PR Body (Use with caution, can be long)
+# Consider using a well-written PR title as the primary source.
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+
+# Template for the overall release notes body
+# $CHANGES will be replaced with the categorized list based on the template above
+# $PREVIOUS_TAG: Tag of the previous release
+# $RESOLVED_VERSION: The version being released (from workflow)
+# $CONTRIBUTORS: List of contributors since the last release
 template: |
   ## What's Changed
 
   $CHANGES
 
-  **Full Changelog**: $PREVIOUS_TAG...$RESOLVED_VERSION
-# You can add more complex logic, exclude labels, change sorting, etc.
-# See the Release Drafter documentation for all options.
+  ## Contributors
+  Huge thanks to everyone who contributed to this release:
+  $CONTRIBUTORS
 
-# Optional: Define the name template for the release title
-# $RESOLVED_VERSION will be the version calculated by our workflow
+  **Full Changelog**: $PREVIOUS_TAG...$RESOLVED_VERSION
+
+# Template for the release title
 name-template: 'Release $RESOLVED_VERSION'
 
-# Optional: Define the tag template (though our workflow creates the tag first)
-# tag-template: 'v$RESOLVED_VERSION' # We explicitly provide the tag in the workflow
+# Template for the tag name (usually corresponds to the version)
+# Our workflow explicitly creates the tag, but this can be a fallback/reference
+tag-template: 'v$RESOLVED_VERSION'
 
-# Automatically manage the draft release on pushes to the default branch
-# This part is usually handled by the Release Drafter App/Action running on 'push',
-# but we trigger the publish manually in our workflow.
+# Optional: Sort changes within categories (commit, title, number) and direction (ascending, descending)
+# sort-by: title
+# sort-direction: ascending # Default is descending commit date
+
+# Optional: Include contributors section automatically
+# contributors:
+#  - title: 'Contributors'
+#    template: 'Thanks again to $CONTRIBUTORS!' # Simpler way if you don't need custom text
+
+# Optional: Version Resolver - we calculate version in the workflow,
+# but RD can also infer based on labels (e.g., 'major', 'minor', 'patch' labels)
+# version-resolver:
+#   major:
+#     labels: ['major', 'breaking-change'] # Example if you used labels for bumping
+#   minor:
+#     labels: ['minor', 'feature', 'enhancement']
+#   patch:
+#     labels: ['patch', 'fix', 'bug', 'chore', 'documentation']
+#   default: patch # Default bump if no matching labels found
