@@ -1,46 +1,121 @@
-name: Release with SemVer
+name: Create Release on Merge
 
 on:
-  push:
-    branches:
-      - main
+  pull_request:
+    types: [closed] # Trigger when a PR is closed
+
+permissions:
+  contents: write      # To create tags and releases
+  pull-requests: read # To read PR title and body
 
 jobs:
-  release:
+  release_on_merge:
+    # Only run if the PR was merged AND the base branch is the repository's default branch
+    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Fetch all history and tags for version calculation and release notes
           fetch-depth: 0
+          # Check out the default branch after the merge, not the PR branch
+          ref: ${{ github.event.repository.default_branch }}
 
-      - name: Semantic versioning
-        id: semver
-        uses: paulhatch/semantic-version@v5.4.0
-        
-      - name: Create Release
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { data: releaseNotes } = await github.rest.repos.generateReleaseNotes({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: `v${process.env.NEXT_VERSION}`,
-              previous_tag_name: process.env.PREVIOUS_TAG
-            });
-            
-            const { data: release } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              tag_name: `v${process.env.NEXT_VERSION}`,
-              name: `v${process.env.NEXT_VERSION}`,
-              body: releaseNotes.body,
-              draft: false,
-              prerelease: false
-            });
-            
-            return release.id;
+      - name: Determine bump type from PR content
+        id: determine_bump
+        run: |
+          # Combine title and body for easier searching (lowercase for case-insensitivity)
+          title=$(echo "${{ github.event.pull_request.title }}" | tr '[:upper:]' '[:lower:]')
+          body=$(echo "${{ github.event.pull_request.body }}" | tr '[:upper:]' '[:lower:]')
+          content="$title $body"
+          bump_type="patch" # Default bump type
+
+          echo "Checking PR content for bump keywords..."
+          # Check for keywords in combined content
+          if [[ "$content" == *bump_major* ]]; then
+            bump_type="major"
+            echo "Found 'bump_major'."
+          elif [[ "$content" == *bump_minor* ]]; then
+            bump_type="minor"
+            echo "Found 'bump_minor'."
+          elif [[ "$content" == *bump_patch* ]]; then
+            bump_type="patch" # Explicit patch keyword overrides default if found (and major/minor not)
+            echo "Found 'bump_patch'."
+          else
+            echo "No specific bump keyword found. Defaulting to 'patch'."
+          fi
+
+          echo "Determined bump type: $bump_type"
+          echo "bump_type=$bump_type" >> $GITHUB_OUTPUT
+
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          # Get the latest tag that looks like a version (vX.Y.Z)
+          # Use --force-long-format with describe if you tag non-release commits,
+          # but for simple vX.Y.Z tags, this should work.
+          latest_tag=$(git describe --tags --abbrev=0 --match="v[0-9]*.[0-9]*.[0-9]*" 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag found: $latest_tag"
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Calculate next version
+        id: calculate_version
+        run: |
+          latest_tag="${{ steps.get_tag.outputs.latest_tag }}"
+          bump_type="${{ steps.determine_bump.outputs.bump_type }}"
+
+          # Strip 'v' prefix if present
+          version=${latest_tag#v}
+
+          # Split into parts, default to 0 if parts are missing (e.g., initial v0.0.0)
+          IFS='.' read -r -a parts <<< "$version"
+          major=${parts[0]:-0}
+          minor=${parts[1]:-0}
+          patch=${parts[2]:-0}
+
+          # Bump version based on determined type
+          case "$bump_type" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          new_version="v$major.$minor.$patch"
+          echo "Calculated next version: $new_version"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        run: |
+          new_version="${{ steps.calculate_version.outputs.new_version }}"
+          echo "Creating tag $new_version"
+          # Configure git user is sometimes necessary in CI
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          # Create an annotated tag (recommended for releases)
+          git tag -a "$new_version" -m "Release $new_version triggered by merge of PR #${{ github.event.pull_request.number }}"
+          git push origin "$new_version"
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
         env:
-          NEXT_VERSION: ${{ steps.semver.outputs.version }}
-          PREVIOUS_TAG: ${{ steps.semver.outputs.previous_tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Provided by Actions
+        with:
+          tag_name: ${{ steps.calculate_version.outputs.new_version }}
+          release_name: Release ${{ steps.calculate_version.outputs.new_version }}
+          # Optional: Add reference to the triggering PR in the release body
+          # The auto-generated notes will appear below this.
+          body: |
+            Automated release triggered by merge of PR #${{ github.event.pull_request.number }}.
+          draft: false
+          prerelease: false
+          generate_release_notes: true # Generate notes based on commits since 'latest_tag'
