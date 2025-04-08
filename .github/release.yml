@@ -1,18 +1,18 @@
 # .github/release-drafter.yml
 
 # Define labels if they don't exist (optional, requires repo write access for the action)
-# ensure-labels-exist:
-#   - feature
-#   - enhancement
-#   - bug
-#   - breaking-change
-#   - notes
-#   - documentation
-#   - chore
-#   - tests
-#   - build
-#   - refactor
-#   - skip-changelog
+ensure-labels-exist:
+  - feature
+  - enhancement
+  - bug
+  - breaking-change
+  - notes
+  - documentation
+  - chore
+  - tests
+  - build
+  - refactor
+  - skip-changelog
 
 # Define the sections/categories based on labels
 # Order matters for the final output
