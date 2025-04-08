@@ -1,5 +1,5 @@
 # Label any pull request that includes changes to Terraform files.
-terraform:
+root:
 - changed-files:
   - any-glob-to-any-file: ['*.tf']
 
