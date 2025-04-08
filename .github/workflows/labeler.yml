@@ -1,14 +1,12 @@
-# .github/workflows/labeler.yml
-name: Labeler
+name: "Pull Request Labeler"
 on:
-  pull_request:
-    types: [opened, edited, reopened]
+- pull_request_target
+
 jobs:
   labeler:
+    permissions:
+      contents: read
+      pull-requests: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Run labeler
-        uses: actions/labeler@v3
-        env:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/labeler@v5
